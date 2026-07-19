@@ -1,0 +1,24 @@
+{
+  "hosting": {
+    "public": ".",
+    "cleanUrls": true,
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      "**/.*",
+      "**/node_modules/**",
+      ".github/**",
+      "README.md",
+      "package.json",
+      "package-lock.json"
+    ],
+    "headers": [
+      {
+        "source": "service-worker.js",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache" }
+        ]
+      }
+    ]
+  }
+}

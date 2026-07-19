@@ -1,0 +1,46 @@
+name: Deploy to Firebase Hosting
+
+# Deploys the app to Firebase Hosting on every push to main.
+#
+# One-time setup by the repo owner (see README):
+#   1. Create a Firebase project and enable Hosting.
+#   2. Put the project ID in .firebaserc.
+#   3. Add a service-account JSON as the GitHub secret FIREBASE_SERVICE_ACCOUNT
+#      (Repo → Settings → Secrets and variables → Actions → New secret).
+#
+# Until that secret exists this workflow runs green and simply skips the deploy,
+# so it never shows a red failure before setup is done.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Firebase is configured
+        id: check
+        run: |
+          if [ -z "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::FIREBASE_SERVICE_ACCOUNT secret not set yet — skipping deploy. See README."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.check.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Deploy to Firebase Hosting (live)
+        if: steps.check.outputs.ready == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live

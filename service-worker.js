@@ -2,25 +2,19 @@
  * Map tiles, geocoding, and routing require a live connection and are not
  * cached (they always try the network).
  */
-var CACHE = 'woodbine-paving-v3';
+var CACHE = 'woodbine-paving-v4';
 var SHELL = [
   './',
   './index.html',
   './styles.css',
+  './config.js',
   './js/app.js',
   './js/calculator.js',
   './js/route.js',
   './manifest.json',
   './assets/woodbine-logo.png',
   './icons/icon-192.png',
-  './icons/icon-512.png',
-  './vendor/leaflet/leaflet.js',
-  './vendor/leaflet/leaflet.css',
-  './vendor/leaflet/images/marker-icon.png',
-  './vendor/leaflet/images/marker-icon-2x.png',
-  './vendor/leaflet/images/marker-shadow.png',
-  './vendor/leaflet/images/layers.png',
-  './vendor/leaflet/images/layers-2x.png'
+  './icons/icon-512.png'
 ];
 
 self.addEventListener('install', function (e) {
@@ -48,10 +42,9 @@ self.addEventListener('fetch', function (e) {
   var url = new URL(req.url);
   // Never cache live map/route/geocode calls — always go to the network.
   var isLiveService =
-    /tile\.openstreetmap\.org/.test(url.host) ||
-    /nominatim\.openstreetmap\.org/.test(url.host) ||
-    /photon\.komoot\.io/.test(url.host) ||
-    /router\.project-osrm\.org/.test(url.host);
+    /maps\.googleapis\.com/.test(url.host) ||
+    /maps\.gstatic\.com/.test(url.host) ||
+    /photon\.komoot\.io/.test(url.host);
   if (isLiveService) return; // let the browser handle it normally
 
   // App shell + same-origin: cache-first, fall back to network.
@@ -68,7 +61,7 @@ self.addEventListener('fetch', function (e) {
     return;
   }
 
-  // Cross-origin (e.g. Leaflet CDN): try cache, then network, then cache it.
+  // Other cross-origin GETs: try cache, then network, then cache it.
   e.respondWith(
     caches.match(req).then(function (hit) {
       return hit || fetch(req).then(function (res) {
