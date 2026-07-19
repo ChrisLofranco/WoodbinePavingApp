@@ -15,8 +15,9 @@
     }
   }
 
-  tabs.forEach(function (tab) {
-    tab.addEventListener('click', function () { showView(tab.dataset.view); });
+  // Any element with data-view navigates — bottom tabs and the home tiles.
+  document.querySelectorAll('[data-view]').forEach(function (el) {
+    el.addEventListener('click', function () { showView(el.dataset.view); });
   });
 
   // ---- Boot feature modules ----
