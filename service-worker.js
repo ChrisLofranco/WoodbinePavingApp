@@ -2,7 +2,7 @@
  * Map tiles, geocoding, and routing require a live connection and are not
  * cached (they always try the network).
  */
-var CACHE = 'woodbine-paving-v6';
+var CACHE = 'woodbine-paving-v7';
 var SHELL = [
   './',
   './index.html',
