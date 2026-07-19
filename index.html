@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Woodbine Paving</title>
+  <meta name="description" content="Route planner and job calculator for Woodbine Paving." />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#1a1a1a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Woodbine Paving" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="icon" href="icons/icon-192.png" />
+
+  <!-- Leaflet (free map library, no API key) — vendored locally, no CDN -->
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">▰</span>
+      <div class="brand-text">
+        <span class="brand-name">Woodbine Paving</span>
+        <span class="brand-sub">GTA</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ============ ROUTE TAB ============ -->
+    <section id="route-view" class="view">
+      <h1 class="view-title">Route Planner</h1>
+      <p class="view-hint">Add today's stops, then optimize for the shortest driving order.</p>
+
+      <div class="card">
+        <div class="stop-input-row">
+          <input id="stop-input" type="text" inputmode="text" autocomplete="off"
+                 placeholder="e.g. 123 Main St, Markham" />
+          <button id="add-stop-btn" class="btn btn-secondary" type="button">Add</button>
+        </div>
+        <button id="use-location-btn" class="btn btn-ghost btn-block" type="button">
+          📍 Use my current location as start
+        </button>
+
+        <ul id="stop-list" class="stop-list" aria-label="Stops"></ul>
+
+        <button id="optimize-btn" class="btn btn-primary btn-block" type="button" disabled>
+          Optimize Route
+        </button>
+        <p id="route-status" class="status-line" role="status"></p>
+      </div>
+
+      <div id="map" class="map" aria-label="Route map"></div>
+
+      <div id="route-result" class="card hidden">
+        <h2 class="card-title">Optimized order</h2>
+        <ol id="ordered-stops" class="ordered-stops"></ol>
+        <a id="open-maps-link" class="btn btn-secondary btn-block" target="_blank" rel="noopener">
+          Open in Google Maps
+        </a>
+      </div>
+    </section>
+
+    <!-- ============ CALCULATOR TAB ============ -->
+    <section id="calc-view" class="view hidden">
+      <h1 class="view-title">Job Calculator</h1>
+      <p class="view-hint">Enter the area to get the price and estimated asphalt.</p>
+
+      <div class="card">
+        <div id="sections"></div>
+        <button id="add-section-btn" class="btn btn-ghost btn-block" type="button">
+          + Add another area
+        </button>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="field-label">Thickness (inches)</span>
+            <input id="thickness" class="calc-input" type="number" inputmode="decimal"
+                   min="0" step="0.25" value="2" />
+          </label>
+          <label class="field">
+            <span class="field-label">Rate ($ / sq ft)</span>
+            <input id="rate" class="calc-input" type="number" inputmode="decimal"
+                   min="0" step="0.01" value="3.50" />
+          </label>
+        </div>
+      </div>
+
+      <div class="card result-card">
+        <div class="result-row">
+          <span class="result-label">Total area</span>
+          <span id="out-sqft" class="result-value">0 sq ft</span>
+        </div>
+
+        <div class="price-grid">
+          <div class="price-box price-cash">
+            <span class="price-tag">Cash (no tax)</span>
+            <span id="out-cash" class="price-amount">$0.00</span>
+          </div>
+          <div class="price-box price-taxed">
+            <span class="price-tag">With HST (13%)</span>
+            <span id="out-taxed" class="price-amount">$0.00</span>
+            <span id="out-hst" class="price-note">incl. $0.00 HST</span>
+          </div>
+        </div>
+
+        <div class="result-row asphalt-row">
+          <span class="result-label">Estimated asphalt</span>
+          <span id="out-tons" class="result-value">0.00 tons</span>
+        </div>
+        <p class="fineprint">Tonnage is an estimate based on the thickness above (hot-mix asphalt ≈ 145 lb/ft³). Adjust thickness to match the job.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ BOTTOM TAB BAR ============ -->
+  <nav class="tabbar" aria-label="Main navigation">
+    <button class="tab active" data-view="route-view" type="button">
+      <span class="tab-icon">🗺️</span>
+      <span class="tab-label">Route</span>
+    </button>
+    <button class="tab" data-view="calc-view" type="button">
+      <span class="tab-icon">🧮</span>
+      <span class="tab-label">Calculator</span>
+    </button>
+  </nav>
+
+  <!-- Leaflet JS (free, no API key) — vendored locally, no CDN -->
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/calculator.js"></script>
+  <script src="js/route.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
