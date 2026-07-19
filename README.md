@@ -1,131 +1,87 @@
 # Woodbine Paving
 
-A phone app (web app / PWA) for **Woodbine Paving** in the GTA, with two tools:
+A phone app (web app / PWA) for **Woodbine Paving** in the GTA. It opens to a
+**home screen** where you pick a tool:
 
-1. **🗺️ Route Planner** — enter the day's job addresses and get the most
-   efficient driving order, drawn on a **Google Map** right inside the app.
-2. **🧮 Job Calculator** — enter the area to get the price and an estimate of
-   how much asphalt (in tons) the job needs.
+1. **🗺️ Route Planner** — enter the day's job addresses, get the most efficient
+   driving order on a map, with the **drive time and distance between each stop**.
+2. **🧮 Job Calculator** — enter the area to get the price and an estimate of how
+   much asphalt (in tons) the job needs.
 
-It runs in the phone's browser and installs to the home screen. The **calculator
-and address suggestions are free**; the **map uses Google Maps**, which needs a
-free API key (see setup below).
+It runs entirely in the phone's browser and costs **nothing** — no paid APIs, no
+API keys, no accounts.
 
 ---
 
 ## How to use it
 
+### Home
+Open the app and tap a tile — **Route Planner** or **Job Calculator**. The bottom
+bar (Home / Route / Calculator) jumps between them any time.
+
 ### Job Calculator
 - Enter **Length** and **Width** in feet. Tap **+ Add another area** for jobs
-  with more than one section — they're summed together.
-- **Thickness** defaults to **2 inches**; change it to match the job (it drives
-  the tonnage estimate).
-- **Rate** defaults to **$3.50 / sq ft**; editable if a job is priced
-  differently.
+  with more than one section — they're summed.
+- **Thickness** defaults to **2"** (drives the tonnage estimate); **Rate**
+  defaults to **$3.50 / sq ft** — both editable.
 - You get: **Total area**, **Cash (no tax)** price, **With HST (13%)** price, and
-  **Estimated asphalt** in tons.
-
-> **Tonnage is an estimate** — from the area and thickness using a standard
-> compacted hot-mix asphalt density (≈ 145 lb/ft³). Adjust the thickness to get
-> a closer estimate.
+  **Estimated asphalt** in tons. (Tonnage is an estimate from area × thickness at
+  a standard hot-mix density ≈ 145 lb/ft³.)
 
 ### Route Planner
-- Start typing an address and a **dropdown of matching addresses** appears — tap
-  one (or use the arrow keys + Enter) to fill it in, then tap **Add**. You can
-  also type a full address and tap **Add** directly.
-- Tap **📍 Use my current location as start** to begin from where you are.
-- Tap **Optimize Route** — the app works out the shortest order and draws it on
-  the map with numbered stops.
+- Start typing an address and a **dropdown of matches** appears — tap one (or
+  arrow-keys + Enter) and tap **Add**. Or tap **📍 Use my current location** as
+  the start.
+- Tap **Optimize Route**. You get the shortest driving order on the map with
+  numbered stops, plus **drive time + distance to each next stop** and a **total
+  drive time** for the day.
 - Tap **Open in Google Maps** to hand the ordered route to Google Maps for
-  turn-by-turn directions while you drive.
+  turn-by-turn while you drive (a free link — no account needed).
 
 ---
 
-## Setup 1 — Google Maps API key (one time)
-
-The in-app map uses Google Maps, which needs an API key on a Google account with
-billing enabled. **Usage will almost certainly stay $0** (Google gives a large
-free monthly credit), but a card on file is required.
-
-1. Go to <https://console.cloud.google.com/> and create or pick a project. Tip:
-   use the **same project** you'll use for Firebase below.
-2. **APIs & Services → Library** — enable all three:
-   - **Maps JavaScript API**
-   - **Geocoding API**
-   - **Directions API**
-3. **APIs & Services → Credentials → Create credentials → API key.** Copy it.
-4. **Restrict the key** (recommended): edit the key → **Application
-   restrictions → Websites**, and add your app's address(es), e.g.
-   `https://YOUR-PROJECT.web.app/*` (and `http://localhost:8099/*` while testing).
-5. Open **`config.js`** and paste the key:
-   ```js
-   window.WOODBINE_CONFIG = { googleMapsApiKey: "PASTE_YOUR_KEY_HERE" };
-   ```
-   Commit the change. (The key is visible in the app — that's normal for a
-   browser map; the website restriction in step 4 is what protects it.)
-
-Until a key is added, the map area shows a short note and everything else keeps
-working.
-
----
-
-## Setup 2 — Firebase Hosting (one time)
-
-Firebase Hosting is **free** (Spark plan — no billing needed for hosting).
-
-1. Go to <https://console.firebase.google.com/>, **Add project**, and pick the
-   **same Google Cloud project** from Setup 1. Enable **Hosting**.
-2. Put your **project ID** in **`.firebaserc`** (replace `YOUR_FIREBASE_PROJECT_ID`).
-3. Give GitHub permission to deploy:
-   - Easiest: install the [Firebase CLI](https://firebase.google.com/docs/cli)
-     and run `firebase init hosting:github` once — it creates the deploy secret
-     and can wire up the workflow automatically.
-   - Or manually: create a **service account** key (Firebase console → Project
-     settings → Service accounts → Generate new private key) and add the JSON as
-     a GitHub secret named **`FIREBASE_SERVICE_ACCOUNT`**
-     (repo → Settings → Secrets and variables → Actions → New secret).
-4. Push to `main`. The **Deploy to Firebase Hosting** GitHub Action publishes the
-   app to `https://YOUR-PROJECT.web.app/`.
-
-Prefer to deploy by hand instead of via GitHub? With the Firebase CLI installed
-and `firebase login` done, run `firebase deploy --only hosting` from this folder.
-
-> Already had this on GitHub Pages? Once Firebase is serving the app, you can
-> turn Pages off: repo → **Settings → Pages → Source: None**.
-
-Then open your Firebase URL on your phone → **Add to Home Screen** (iPhone Share
-menu / Android ⋮ menu).
-
----
-
-## How it works
+## How it works (all free, no keys)
 
 | Feature | Service |
 |--------|---------|
-| Map, road route, geocoding | [Google Maps Platform](https://developers.google.com/maps) (your API key) |
-| Address suggestions (type-ahead) | [Photon](https://photon.komoot.io/) (free, keyless) |
-| Best stop order | Calculated on your phone (open-path nearest-neighbor + 2-opt) |
-| Hosting | [Firebase Hosting](https://firebase.google.com/docs/hosting) (free) |
+| Map display | [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) tiles (bundled in `vendor/leaflet/`) |
+| Address suggestions | [Photon](https://photon.komoot.io/) (OpenStreetMap) |
+| Address → map location | [Nominatim](https://nominatim.org/) (OpenStreetMap geocoder) |
+| Road route + drive times | [OSRM](http://project-osrm.org/) public server, with a straight-line + estimated-time fallback |
+| Best stop order | Calculated on your phone (nearest-neighbor + 2-opt) |
 
-The calculator works offline (service worker); the map and address lookups need
-an internet connection.
+The free public OSM/OSRM servers are best-effort and rate-limited — plenty for
+one crew's daily use. The map and address/route lookups need an internet
+connection; the **calculator works offline**.
+
+---
+
+## Hosting
+
+Currently published on **GitHub Pages** from the `gh-pages` branch. To publish a
+change: repo **Settings → Pages**, make sure the source is **Deploy from a
+branch → `gh-pages` → /(root)**, and **Save** (that triggers a rebuild).
+
+A **Firebase Hosting** setup is also included (`firebase.json`, `.firebaserc`,
+`.github/workflows/firebase-deploy.yml`) for later, if you want fully automatic
+deploys — it stays dormant until a `FIREBASE_SERVICE_ACCOUNT` secret is added.
+
+Open the site on your phone → **Add to Home Screen** (iPhone Share menu /
+Android ⋮ menu) to get the app icon.
 
 ---
 
 ## Project layout
 
 ```
-index.html          App shell + two tabs
+index.html          App shell: Home + Route + Calculator
 styles.css          Styling (mobile-first)
-config.js           Your Google Maps API key goes here
-js/app.js           Tab navigation + PWA registration
+js/app.js           Navigation (home tiles + tabs) + PWA registration
 js/calculator.js    Pricing + tonnage math
-js/route.js         Google map, geocoding, route optimization
+js/route.js         Leaflet map, geocoding, optimization, drive times
 manifest.json       PWA metadata ("Add to Home Screen")
 service-worker.js   Offline caching of the app
 icons/              App icons
 assets/             Company logo
-firebase.json       Firebase Hosting config
-.firebaserc         Firebase project ID
-.github/workflows/  Auto-deploy to Firebase on push
+vendor/leaflet/     Bundled map library (no CDN needed)
 ```

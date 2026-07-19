@@ -165,8 +165,39 @@ main { padding: 16px; max-width: 640px; margin: 0 auto; }
 .map { overflow: hidden; }
 .map .gm-style { border-radius: var(--radius); }
 
-.ordered-stops { margin: 0 0 14px; padding-left: 22px; }
-.ordered-stops li { margin-bottom: 8px; font-size: 15px; }
+.route-total {
+  margin: 0 0 14px; padding: 10px 12px; border-radius: 10px;
+  background: rgba(225,27,34,.12); border: 1px solid rgba(225,27,34,.4);
+  color: var(--text); font-weight: 700; font-size: 15px;
+}
+.ordered-stops { list-style: none; margin: 0 0 14px; padding: 0; }
+.ordered-head { display: flex; align-items: center; gap: 10px; }
+.ordered-num {
+  flex: none; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent); color: #fff; font-weight: 700; font-size: 12px;
+  display: grid; place-items: center;
+}
+.ordered-num.start { background: #fff; color: #000; }
+.ordered-text { font-size: 15px; }
+.ordered-leg { color: var(--text-dim); font-size: 13px; margin: 3px 0 10px 34px; }
+.ordered-leg strong { color: var(--accent); font-weight: 700; }
+.leg-arrow { color: var(--accent); font-weight: 700; }
+
+/* ---------- Home launcher ---------- */
+.home-tagline { color: var(--text-dim); font-size: 15px; margin: 6px 0 18px; text-align: center; }
+.home-grid { display: grid; gap: 14px; }
+.home-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius); padding: 20px; cursor: pointer; text-align: left;
+  transition: filter .12s ease, transform .05s ease;
+}
+.home-card:active { transform: scale(.99); }
+.home-card:hover { filter: brightness(1.08); }
+.home-card-icon { font-size: 34px; line-height: 1; }
+.home-card-title { font-size: 19px; font-weight: 700; color: var(--text); }
+.home-card-sub { font-size: 13px; color: var(--text-dim); }
 
 /* ---------- Calculator ---------- */
 .section-block {
