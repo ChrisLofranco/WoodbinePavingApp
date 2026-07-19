@@ -159,6 +159,14 @@ main { padding: 16px; max-width: 640px; margin: 0 auto; }
   background: var(--surface-2);
 }
 .leaflet-container { background: var(--surface-2); font: inherit; }
+.map-message {
+  height: 100%; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 24px; color: var(--text-dim); font-size: 14px;
+  line-height: 1.5;
+}
+/* Google Maps injects its own controls; keep the container clipped. */
+.map { overflow: hidden; }
+.map .gm-style { border-radius: var(--radius); }
 
 .ordered-stops { margin: 0 0 14px; padding-left: 22px; }
 .ordered-stops li { margin-bottom: 8px; font-size: 15px; }

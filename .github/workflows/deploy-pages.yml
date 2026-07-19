@@ -1,8 +1,11 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages (bridge)
 
-# GitHub Pages is served from the `gh-pages` branch. On every push to main this
-# mirrors the site there, which triggers GitHub's built-in Pages build so the
-# live app stays up to date. Needs only contents:write (no Pages-admin token).
+# TEMPORARY BRIDGE: keeps the existing GitHub Pages link updating until Firebase
+# Hosting is set up and confirmed. Once Firebase is live, this file can be
+# deleted and GitHub Pages turned off (Settings → Pages → Source: None).
+#
+# Mirrors main to the gh-pages branch, which triggers GitHub's built-in Pages
+# build. Needs only contents:write.
 on:
   push:
     branches:

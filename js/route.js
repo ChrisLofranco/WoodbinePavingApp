@@ -1,28 +1,28 @@
-/* route.js — day's stops -> most efficient driving order, drawn on a map.
+/* route.js — day's stops -> most efficient driving order on a Google map.
  *
- * All services are free & keyless:
- *   - Map tiles:   OpenStreetMap via Leaflet
- *   - Geocoding:   Nominatim (nominatim.openstreetmap.org)
- *   - Road path:   OSRM public demo (router.project-osrm.org), with a
- *                  straight-line fallback if it's unavailable.
- * Stop ordering is solved on-device (nearest-neighbor + 2-opt), so no
- * routing/optimization API is required.
+ *   - Map + roads: Google Maps JavaScript API + Directions. Needs an API key in
+ *                  config.js (see README); without one the map shows a short
+ *                  note and the rest of the app keeps working. Straight-line
+ *                  fallback if Directions is unavailable.
+ *   - Suggestions: Photon (free, keyless) type-ahead in the search bar.
+ *   - Geocoding:   Google Geocoder for typed addresses (addresses picked from
+ *                  the suggestions dropdown already carry coordinates).
+ * Stop ordering is solved on-device (nearest-neighbor + 2-opt) so the route is
+ * an open path: start -> jobs, with no forced return to the start.
  */
 (function () {
   'use strict';
 
-  var NOMINATIM = 'https://nominatim.openstreetmap.org/search';
-  var OSRM = 'https://router.project-osrm.org/route/v1/driving/';
   // Photon (free, keyless) powers the type-ahead address suggestions.
   var PHOTON = 'https://photon.komoot.io/api/';
-  // Bias geocoding toward the Greater Toronto Area.
-  var GTA_VIEWBOX = '-80.30,44.30,-78.50,43.10'; // left,top,right,bottom
-  var GTA_CENTER = [43.72, -79.42];
+  var GTA_CENTER = [43.72, -79.42];      // map default + suggestion bias
 
   // ---- State ----
   var stops = [];            // { id, text, isStart, lat, lng }
   var nextId = 1;
-  var map = null, markerLayer = null, routeLayer = null;
+  var map = null, directionsRenderer = null, geocoder = null;
+  var googleReady = false;               // Google Maps JS loaded + map created
+  var fallbackObjs = [];                 // markers/line drawn without Directions
 
   // ---------- Geometry / optimization (pure, testable) ----------
 
@@ -102,26 +102,133 @@
     while (i < m) { var t = arr[i]; arr[i] = arr[m]; arr[m] = t; i++; m--; }
   }
 
-  // ---------- Geocoding ----------
+  // ---------- Google Maps loader ----------
 
-  function geocode(query) {
-    var url = NOMINATIM + '?format=json&limit=1&countrycodes=ca' +
-      '&viewbox=' + encodeURIComponent(GTA_VIEWBOX) +
-      '&q=' + encodeURIComponent(query);
-    return fetch(url, { headers: { 'Accept': 'application/json' } })
-      .then(function (r) {
-        if (!r.ok) throw new Error('geocode ' + r.status);
-        return r.json();
-      })
-      .then(function (arr) {
-        if (!arr || !arr.length) return null;
-        return { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon) };
-      });
+  // Inject the Maps JS API using the key from config.js. Calls back with an
+  // Error('no-key') when no key is set, or Error('load-failed') if the script
+  // can't load — in both cases the app stays usable, just without the map.
+  function loadGoogleMaps(cb) {
+    if (window.google && window.google.maps) { cb(); return; }
+    var key = (window.WOODBINE_CONFIG && window.WOODBINE_CONFIG.googleMapsApiKey) || '';
+    if (!key) { cb(new Error('no-key')); return; }
+    if (loadGoogleMaps._cbs) { loadGoogleMaps._cbs.push(cb); return; }
+    loadGoogleMaps._cbs = [cb];
+    window.__wbGmapsReady = function () {
+      loadGoogleMaps._cbs.forEach(function (f) { f(); });
+    };
+    var s = document.createElement('script');
+    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) +
+      '&loading=async&callback=__wbGmapsReady';
+    s.async = true;
+    s.onerror = function () {
+      loadGoogleMaps._cbs.forEach(function (f) { f(new Error('load-failed')); });
+    };
+    document.head.appendChild(s);
   }
 
-  // Nominatim asks for <=1 request/second; geocode stops sequentially.
-  // Stops chosen from the autocomplete (or "my location") already carry
-  // coordinates, so we skip the lookup for those.
+  // Dark map styling to match the app's black/red theme.
+  var DARK_MAP_STYLE = [
+    { elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#1a1a1a' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#9e9e9e' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2b2b2b' }] },
+    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212121' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#3a3a3a' }] },
+    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#c9c9c9' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d0d0d' }] },
+    { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+    { featureType: 'transit', stylers: [{ visibility: 'off' }] }
+  ];
+
+  function showMapMessage(msg) {
+    var el = document.getElementById('map');
+    if (el) el.innerHTML = '<div class="map-message">' + escapeHtml(msg) + '</div>';
+  }
+
+  function ensureMap() {
+    if (map || !(window.google && window.google.maps)) return;
+    var el = document.getElementById('map');
+    el.innerHTML = '';
+    map = new google.maps.Map(el, {
+      center: { lat: GTA_CENTER[0], lng: GTA_CENTER[1] },
+      zoom: 10,
+      mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
+      styles: DARK_MAP_STYLE
+    });
+    directionsRenderer = new google.maps.DirectionsRenderer({
+      map: map, suppressMarkers: false,
+      polylineOptions: { strokeColor: '#e11b22', strokeWeight: 5, strokeOpacity: 0.9 }
+    });
+    geocoder = new google.maps.Geocoder();
+    googleReady = true;
+  }
+
+  // Google needs a resize nudge when its container was hidden while created.
+  function refreshMap() {
+    if (map && window.google) google.maps.event.trigger(map, 'resize');
+  }
+
+  function clearFallback() {
+    fallbackObjs.forEach(function (o) { o.setMap(null); });
+    fallbackObjs = [];
+  }
+
+  function drawRoute(ordered) {
+    if (!googleReady) return;
+    clearFallback();
+    directionsRenderer.set('directions', null);
+
+    var toLL = function (s) { return { lat: s.lat, lng: s.lng }; };
+    new google.maps.DirectionsService().route({
+      origin: toLL(ordered[0]),
+      destination: toLL(ordered[ordered.length - 1]),
+      waypoints: ordered.slice(1, -1).map(function (s) {
+        return { location: toLL(s), stopover: true };
+      }),
+      optimizeWaypoints: false,          // we already ordered them (open path)
+      travelMode: google.maps.TravelMode.DRIVING
+    }, function (res, status) {
+      if (status === 'OK' && res) { directionsRenderer.setDirections(res); }
+      else { drawFallback(ordered); } // e.g. too many stops, or a routing error
+    });
+  }
+
+  // Straight-line route + numbered markers when Directions can't be used.
+  function drawFallback(ordered) {
+    var bounds = new google.maps.LatLngBounds();
+    var path = ordered.map(function (s) {
+      var ll = { lat: s.lat, lng: s.lng }; bounds.extend(ll); return ll;
+    });
+    fallbackObjs.push(new google.maps.Polyline({
+      path: path, map: map, strokeColor: '#e11b22', strokeWeight: 4, strokeOpacity: 0.85
+    }));
+    ordered.forEach(function (s, i) {
+      var label = s.isStart ? 'S' : String(i + (ordered[0].isStart ? 0 : 1));
+      fallbackObjs.push(new google.maps.Marker({
+        position: { lat: s.lat, lng: s.lng }, map: map,
+        label: { text: label, color: '#ffffff', fontWeight: '700' }
+      }));
+    });
+    map.fitBounds(bounds, 40);
+  }
+
+  // ---------- Geocoding (Google) ----------
+
+  function geocode(query) {
+    return new Promise(function (resolve) {
+      if (!geocoder) { resolve(null); return; }
+      geocoder.geocode({ address: query, componentRestrictions: { country: 'CA' } },
+        function (res, status) {
+          if (status === 'OK' && res && res[0]) {
+            var loc = res[0].geometry.location;
+            resolve({ lat: loc.lat(), lng: loc.lng() });
+          } else { resolve(null); }
+        });
+    });
+  }
+
+  // Geocode stops sequentially. Stops picked from the suggestions dropdown (or
+  // "my location") already carry coordinates, so we skip the lookup for those.
   function geocodeAll(list) {
     var results = [];
     return list.reduce(function (p, item) {
@@ -132,71 +239,9 @@
         }
         return geocode(item.text).then(function (coords) {
           results.push({ item: item, coords: coords });
-          return delay(1100);
         });
       });
     }, Promise.resolve()).then(function () { return results; });
-  }
-  function delay(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
-
-  // ---------- Map ----------
-
-  function ensureMap() {
-    if (map || !window.L) return;
-    map = L.map('map', { zoomControl: true }).setView(GTA_CENTER, 10);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-    markerLayer = L.layerGroup().addTo(map);
-    routeLayer = L.layerGroup().addTo(map);
-  }
-
-  function refreshMap() {
-    ensureMap();
-    if (map) setTimeout(function () { map.invalidateSize(); }, 50);
-  }
-
-  function drawRoute(ordered) {
-    ensureMap();
-    if (!map) return;
-    markerLayer.clearLayers();
-    routeLayer.clearLayers();
-
-    var latlngs = ordered.map(function (s) { return [s.lat, s.lng]; });
-
-    ordered.forEach(function (s, i) {
-      var label = s.isStart ? 'S' : String(i + (ordered[0].isStart ? 0 : 1));
-      var color = s.isStart ? '#ffffff' : '#e11b22';
-      var textColor = s.isStart ? '#000' : '#fff';
-      var icon = L.divIcon({
-        className: 'route-pin',
-        html: '<div style="background:' + color + ';color:' + textColor + ';font-weight:700;' +
-          'width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);' +
-          'display:grid;place-items:center;border:2px solid #000;box-shadow:0 1px 4px rgba(0,0,0,.5)">' +
-          '<span style="transform:rotate(45deg);font-size:12px">' + label + '</span></div>',
-        iconSize: [28, 28], iconAnchor: [14, 28]
-      });
-      L.marker([s.lat, s.lng], { icon: icon })
-        .bindPopup((s.isStart ? 'Start: ' : (i + 1) + '. ') + escapeHtml(s.text))
-        .addTo(markerLayer);
-    });
-
-    map.fitBounds(latlngs, { padding: [40, 40], maxZoom: 14 });
-
-    // Try to fetch the real road path; fall back to straight lines.
-    var coordParam = ordered.map(function (s) { return s.lng + ',' + s.lat; }).join(';');
-    fetch(OSRM + coordParam + '?overview=full&geometries=geojson')
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-      .then(function (data) {
-        if (data && data.routes && data.routes.length) {
-          var line = data.routes[0].geometry.coordinates.map(function (c) { return [c[1], c[0]]; });
-          L.polyline(line, { color: '#e11b22', weight: 5, opacity: .9 }).addTo(routeLayer);
-        } else { throw new Error('no route'); }
-      })
-      .catch(function () {
-        L.polyline(latlngs, { color: '#e11b22', weight: 4, opacity: .8, dashArray: '8 6' }).addTo(routeLayer);
-      });
   }
 
   // ---------- UI ----------
@@ -254,6 +299,10 @@
   }
 
   function optimize() {
+    if (!googleReady) {
+      setStatus('The map isn’t set up yet — add your Google Maps API key in config.js (see README).', 'error');
+      return;
+    }
     setStatus('Looking up addresses…', 'working');
     optimizeBtn.disabled = true;
     resultEl.classList.add('hidden');
@@ -465,8 +514,20 @@
     optimizeBtn.addEventListener('click', optimize);
 
     render();
-    // Map is created lazily on first view of the Route tab.
-    refreshMap();
+
+    // Load Google Maps (map + geocoding + directions). Until it's ready — or if
+    // there's no API key yet — the map area shows guidance while the calculator
+    // and address suggestions keep working.
+    loadGoogleMaps(function (err) {
+      if (err) {
+        showMapMessage(err.message === 'no-key'
+          ? 'Add your Google Maps API key in config.js to turn on the map (see README). The calculator and address search still work without it.'
+          : 'Google Maps couldn’t load — check the API key and your connection.');
+        return;
+      }
+      ensureMap();
+      refreshMap();
+    });
   }
 
   window.WoodbineRoute = {
