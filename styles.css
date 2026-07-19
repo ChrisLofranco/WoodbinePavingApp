@@ -43,14 +43,11 @@ body {
   justify-content: center;
 }
 .brand-logo {
-  height: 44px;
+  height: 46px;
   width: auto;
   max-width: 100%;
   object-fit: contain;
   display: block;
-  background: #fff;          /* logo has knockout text — needs a light backing */
-  padding: 7px 16px;
-  border-radius: 10px;
 }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-mark {
