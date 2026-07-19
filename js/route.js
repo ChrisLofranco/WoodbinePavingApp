@@ -13,6 +13,8 @@
 
   var NOMINATIM = 'https://nominatim.openstreetmap.org/search';
   var OSRM = 'https://router.project-osrm.org/route/v1/driving/';
+  // Photon (free, keyless) powers the type-ahead address suggestions.
+  var PHOTON = 'https://photon.komoot.io/api/';
   // Bias geocoding toward the Greater Toronto Area.
   var GTA_VIEWBOX = '-80.30,44.30,-78.50,43.10'; // left,top,right,bottom
   var GTA_CENTER = [43.72, -79.42];
@@ -118,10 +120,16 @@
   }
 
   // Nominatim asks for <=1 request/second; geocode stops sequentially.
+  // Stops chosen from the autocomplete (or "my location") already carry
+  // coordinates, so we skip the lookup for those.
   function geocodeAll(list) {
     var results = [];
     return list.reduce(function (p, item) {
       return p.then(function () {
+        if (typeof item.lat === 'number' && typeof item.lng === 'number') {
+          results.push({ item: item, coords: { lat: item.lat, lng: item.lng } });
+          return;
+        }
         return geocode(item.text).then(function (coords) {
           results.push({ item: item, coords: coords });
           return delay(1100);
@@ -159,12 +167,13 @@
 
     ordered.forEach(function (s, i) {
       var label = s.isStart ? 'S' : String(i + (ordered[0].isStart ? 0 : 1));
-      var color = s.isStart ? '#2ecc71' : '#f5a623';
+      var color = s.isStart ? '#ffffff' : '#e11b22';
+      var textColor = s.isStart ? '#000' : '#fff';
       var icon = L.divIcon({
         className: 'route-pin',
-        html: '<div style="background:' + color + ';color:#111;font-weight:700;' +
+        html: '<div style="background:' + color + ';color:' + textColor + ';font-weight:700;' +
           'width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);' +
-          'display:grid;place-items:center;border:2px solid #111;box-shadow:0 1px 4px rgba(0,0,0,.5)">' +
+          'display:grid;place-items:center;border:2px solid #000;box-shadow:0 1px 4px rgba(0,0,0,.5)">' +
           '<span style="transform:rotate(45deg);font-size:12px">' + label + '</span></div>',
         iconSize: [28, 28], iconAnchor: [14, 28]
       });
@@ -182,17 +191,22 @@
       .then(function (data) {
         if (data && data.routes && data.routes.length) {
           var line = data.routes[0].geometry.coordinates.map(function (c) { return [c[1], c[0]]; });
-          L.polyline(line, { color: '#f5a623', weight: 5, opacity: .9 }).addTo(routeLayer);
+          L.polyline(line, { color: '#e11b22', weight: 5, opacity: .9 }).addTo(routeLayer);
         } else { throw new Error('no route'); }
       })
       .catch(function () {
-        L.polyline(latlngs, { color: '#f5a623', weight: 4, opacity: .8, dashArray: '8 6' }).addTo(routeLayer);
+        L.polyline(latlngs, { color: '#e11b22', weight: 4, opacity: .8, dashArray: '8 6' }).addTo(routeLayer);
       });
   }
 
   // ---------- UI ----------
 
   var inputEl, listEl, optimizeBtn, statusEl, resultEl, orderedEl, mapsLink;
+  var suggestEl;                       // dropdown <ul>
+  var pendingCoords = null;            // coords of the currently picked suggestion
+  var suggestItems = [];               // current suggestion data
+  var activeIdx = -1;                  // highlighted suggestion (keyboard)
+  var suggestTimer = null, suggestSeq = 0;
 
   function render() {
     listEl.innerHTML = '';
@@ -313,6 +327,98 @@
     });
   }
 
+  // ---------- Address autocomplete (Photon, free & keyless) ----------
+
+  // Turn a Photon GeoJSON feature into a tidy suggestion.
+  function formatFeature(f) {
+    var p = f.properties || {};
+    var streetLine = [p.housenumber, p.street].filter(Boolean).join(' ');
+    var main = streetLine || p.name || p.city || p.county || p.state || 'Unknown place';
+    var sub = [p.city || p.county, p.state, p.postcode].filter(Boolean).join(', ');
+    var text = [main, p.city || p.county, p.state].filter(Boolean).join(', ');
+    var c = (f.geometry && f.geometry.coordinates) || [];
+    return { main: main, sub: sub, text: text, lat: c[1], lng: c[0] };
+  }
+
+  function fetchSuggestions(query) {
+    var seq = ++suggestSeq;
+    var url = PHOTON + '?q=' + encodeURIComponent(query) +
+      '&limit=6&lang=en&lat=' + GTA_CENTER[0] + '&lon=' + GTA_CENTER[1];
+    fetch(url)
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (data) {
+        if (seq !== suggestSeq) return;                 // a newer query superseded this one
+        var feats = (data && data.features) || [];
+        renderSuggestions(feats.map(formatFeature).filter(function (s) {
+          return typeof s.lat === 'number' && typeof s.lng === 'number';
+        }));
+      })
+      .catch(function () {
+        if (seq === suggestSeq) clearSuggestions();      // network/offline: just hide it
+      });
+  }
+
+  function renderSuggestions(items) {
+    suggestItems = items;
+    activeIdx = -1;
+    suggestEl.innerHTML = '';
+    if (!items.length) { clearSuggestions(); return; }
+    items.forEach(function (item, i) {
+      var li = document.createElement('li');
+      li.setAttribute('role', 'option');
+      var main = document.createElement('span');
+      main.className = 'sug-main';
+      main.textContent = item.main;
+      li.appendChild(main);
+      if (item.sub) {
+        var sub = document.createElement('span');
+        sub.className = 'sug-sub';
+        sub.textContent = '· ' + item.sub;
+        li.appendChild(sub);
+      }
+      li.addEventListener('mousedown', function (e) {
+        e.preventDefault();                 // keep focus in the input
+        selectSuggestion(i);
+      });
+      suggestEl.appendChild(li);
+    });
+    suggestEl.classList.remove('hidden');
+    inputEl.setAttribute('aria-expanded', 'true');
+  }
+
+  function clearSuggestions() {
+    suggestItems = [];
+    activeIdx = -1;
+    suggestEl.innerHTML = '';
+    suggestEl.classList.add('hidden');
+    inputEl.setAttribute('aria-expanded', 'false');
+  }
+
+  function highlight(idx) {
+    var lis = suggestEl.querySelectorAll('li');
+    lis.forEach(function (li, i) { li.classList.toggle('active', i === idx); });
+    activeIdx = idx;
+  }
+
+  function selectSuggestion(i) {
+    var item = suggestItems[i];
+    if (!item) return;
+    inputEl.value = item.text;             // programmatic set does not fire 'input'
+    pendingCoords = { lat: item.lat, lng: item.lng };
+    clearSuggestions();
+  }
+
+  // Add whatever is in the input as a stop, using picked coords when available.
+  function commitInput() {
+    var text = inputEl.value.trim();
+    if (!text) return;
+    addStop(text, false, pendingCoords);
+    inputEl.value = '';
+    pendingCoords = null;
+    clearSuggestions();
+    inputEl.focus();
+  }
+
   function init() {
     inputEl = document.getElementById('stop-input');
     listEl = document.getElementById('stop-list');
@@ -321,15 +427,40 @@
     resultEl = document.getElementById('route-result');
     orderedEl = document.getElementById('ordered-stops');
     mapsLink = document.getElementById('open-maps-link');
+    suggestEl = document.getElementById('suggestions');
 
-    document.getElementById('add-stop-btn').addEventListener('click', function () {
-      addStop(inputEl.value, false);
-      inputEl.value = '';
-      inputEl.focus();
+    document.getElementById('add-stop-btn').addEventListener('click', commitInput);
+
+    // Type-ahead: debounce, then fetch suggestions. Typing invalidates any
+    // previously picked coordinates.
+    inputEl.addEventListener('input', function () {
+      pendingCoords = null;
+      var q = inputEl.value.trim();
+      if (suggestTimer) clearTimeout(suggestTimer);
+      if (q.length < 3) { clearSuggestions(); return; }
+      suggestTimer = setTimeout(function () { fetchSuggestions(q); }, 280);
     });
+
     inputEl.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { addStop(inputEl.value, false); inputEl.value = ''; }
+      var open = !suggestEl.classList.contains('hidden') && suggestItems.length;
+      if (e.key === 'ArrowDown' && open) {
+        e.preventDefault();
+        highlight((activeIdx + 1) % suggestItems.length);
+      } else if (e.key === 'ArrowUp' && open) {
+        e.preventDefault();
+        highlight((activeIdx - 1 + suggestItems.length) % suggestItems.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (open && activeIdx >= 0) { selectSuggestion(activeIdx); }
+        else { commitInput(); }
+      } else if (e.key === 'Escape') {
+        clearSuggestions();
+      }
     });
+
+    // Close the dropdown when focus leaves the field.
+    inputEl.addEventListener('blur', function () { setTimeout(clearSuggestions, 120); });
+
     document.getElementById('use-location-btn').addEventListener('click', useLocation);
     optimizeBtn.addEventListener('click', optimize);
 

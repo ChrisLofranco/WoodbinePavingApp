@@ -2,7 +2,7 @@
  * Map tiles, geocoding, and routing require a live connection and are not
  * cached (they always try the network).
  */
-var CACHE = 'woodbine-paving-v2';
+var CACHE = 'woodbine-paving-v3';
 var SHELL = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ var SHELL = [
   './js/calculator.js',
   './js/route.js',
   './manifest.json',
+  './assets/woodbine-logo.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './vendor/leaflet/leaflet.js',
@@ -49,6 +50,7 @@ self.addEventListener('fetch', function (e) {
   var isLiveService =
     /tile\.openstreetmap\.org/.test(url.host) ||
     /nominatim\.openstreetmap\.org/.test(url.host) ||
+    /photon\.komoot\.io/.test(url.host) ||
     /router\.project-osrm\.org/.test(url.host);
   if (isLiveService) return; // let the browser handle it normally
 

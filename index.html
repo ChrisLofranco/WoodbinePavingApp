@@ -8,7 +8,7 @@
 
   <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#1a1a1a" />
+  <meta name="theme-color" content="#0d0d0d" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Woodbine Paving" />
@@ -22,13 +22,7 @@
 </head>
 <body>
   <header class="app-header">
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true">▰</span>
-      <div class="brand-text">
-        <span class="brand-name">Woodbine Paving</span>
-        <span class="brand-sub">GTA</span>
-      </div>
-    </div>
+    <img class="brand-logo" src="assets/woodbine-logo.png" alt="Woodbine Paving Ltd." />
   </header>
 
   <main>
@@ -38,10 +32,14 @@
       <p class="view-hint">Add today's stops, then optimize for the shortest driving order.</p>
 
       <div class="card">
-        <div class="stop-input-row">
-          <input id="stop-input" type="text" inputmode="text" autocomplete="off"
-                 placeholder="e.g. 123 Main St, Markham" />
-          <button id="add-stop-btn" class="btn btn-secondary" type="button">Add</button>
+        <div class="stop-input-wrap">
+          <div class="stop-input-row">
+            <input id="stop-input" type="text" inputmode="text" autocomplete="off"
+                   placeholder="Start typing an address…" role="combobox"
+                   aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions" />
+            <button id="add-stop-btn" class="btn btn-secondary" type="button">Add</button>
+          </div>
+          <ul id="suggestions" class="suggestions hidden" role="listbox" aria-label="Address suggestions"></ul>
         </div>
         <button id="use-location-btn" class="btn btn-ghost btn-block" type="button">
           📍 Use my current location as start

@@ -33,8 +33,10 @@ paid APIs or API keys.
 > closer estimate.
 
 ### Route Planner
-- Type an address and tap **Add** for each stop. Tap **📍 Use my current
-  location as start** to begin the route from where you are.
+- Start typing an address and a **dropdown of matching addresses** appears — tap
+  one (or use the arrow keys + Enter) to fill it in, then tap **Add**. You can
+  also type a full address and tap **Add** directly.
+- Tap **📍 Use my current location as start** to begin the route from where you are.
 - Tap **Optimize Route**. The app looks up each address, works out the shortest
   order to drive them, and draws the route on the map with numbered stops.
 - Tap **Open in Google Maps** to hand the ordered route to Google Maps for
@@ -65,6 +67,7 @@ Everything is free and needs no sign-up or API key:
 | Feature | Service |
 |--------|---------|
 | Map display | [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) tiles (bundled in `vendor/leaflet/`) |
+| Address suggestions (type-ahead) | [Photon](https://photon.komoot.io/) (OpenStreetMap) |
 | Address → map location | [Nominatim](https://nominatim.org/) (OpenStreetMap geocoder) |
 | Road path on the map | [OSRM](http://project-osrm.org/) public server, with a straight-line fallback if it's unavailable |
 | Best stop order | Calculated on your phone (no service needed) |
