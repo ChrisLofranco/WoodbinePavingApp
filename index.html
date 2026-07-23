@@ -40,6 +40,11 @@
           <span class="home-card-title">Job Calculator</span>
           <span class="home-card-sub">Price a job + asphalt needed</span>
         </button>
+        <button class="home-card" type="button" data-view="jobs-view">
+          <span class="home-card-icon">📋</span>
+          <span class="home-card-title">Jobs</span>
+          <span class="home-card-sub">Saved quotes, statuses & estimates</span>
+        </button>
       </div>
     </section>
 
@@ -151,6 +156,49 @@
         </div>
         <p class="fineprint">Tonnage is an estimate based on the thickness above (hot-mix asphalt ≈ 145 lb/ft³). Adjust thickness to match the job.</p>
       </div>
+
+      <div class="card">
+        <span class="field-heading">Save as a quote</span>
+        <label class="field"><span class="field-label">Customer name</span>
+          <input id="cust-name" class="text-input" type="text" autocomplete="off" placeholder="e.g. John Smith" /></label>
+        <label class="field"><span class="field-label">Job address</span>
+          <input id="cust-address" class="text-input" type="text" autocomplete="off" placeholder="e.g. 123 Main St, Markham" /></label>
+        <div class="field-row">
+          <label class="field"><span class="field-label">Phone (optional)</span>
+            <input id="cust-phone" class="text-input" type="tel" autocomplete="off" placeholder="(416) 555-0100" /></label>
+          <label class="field"><span class="field-label">Email (optional)</span>
+            <input id="cust-email" class="text-input" type="email" autocomplete="off" placeholder="name@email.com" /></label>
+        </div>
+        <button id="save-quote-btn" class="btn btn-primary btn-block" type="button">Save as quote</button>
+        <p id="save-confirm" class="save-confirm hidden" role="status"></p>
+      </div>
+    </section>
+
+    <!-- ============ JOBS TAB ============ -->
+    <section id="jobs-view" class="view hidden">
+      <h1 class="view-title">Jobs</h1>
+      <p class="view-hint">Saved quotes. Change status, print an estimate, or send an address to the route.</p>
+
+      <div id="jobs-empty" class="card jobs-empty hidden">
+        No saved jobs yet. Price a job in the <strong>Calculator</strong> and tap <strong>Save as quote</strong>.
+      </div>
+      <div id="jobs-list"></div>
+
+      <div class="card">
+        <span class="field-heading">Business details (on estimates)</span>
+        <label class="field"><span class="field-label">Business name</span>
+          <input id="biz-name" class="text-input" type="text" autocomplete="off" placeholder="Woodbine Paving Ltd." /></label>
+        <div class="field-row">
+          <label class="field"><span class="field-label">Phone</span>
+            <input id="biz-phone" class="text-input" type="tel" autocomplete="off" placeholder="(416) 555-0100" /></label>
+          <label class="field"><span class="field-label">Email</span>
+            <input id="biz-email" class="text-input" type="email" autocomplete="off" placeholder="info@woodbinepaving.ca" /></label>
+        </div>
+        <button id="biz-save-btn" class="btn btn-secondary btn-block" type="button">Save business details</button>
+        <p id="biz-confirm" class="save-confirm hidden" role="status"></p>
+      </div>
+
+      <p class="fineprint">Jobs are saved on this device only. (Syncing across phones would be a later upgrade.)</p>
     </section>
   </main>
 
@@ -168,12 +216,21 @@
       <span class="tab-icon">🧮</span>
       <span class="tab-label">Calculator</span>
     </button>
+    <button class="tab" data-view="jobs-view" type="button">
+      <span class="tab-icon">📋</span>
+      <span class="tab-label">Jobs</span>
+    </button>
   </nav>
+
+  <!-- Printable estimate (shown only when printing; see @media print) -->
+  <div class="estimate-sheet" id="estimate-sheet" aria-hidden="true"></div>
 
   <!-- Leaflet JS (free, no API key) — vendored locally, no CDN -->
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/store.js"></script>
   <script src="js/calculator.js"></script>
   <script src="js/route.js"></script>
+  <script src="js/jobs.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

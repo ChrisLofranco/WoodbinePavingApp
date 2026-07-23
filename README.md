@@ -7,6 +7,8 @@ A phone app (web app / PWA) for **Woodbine Paving** in the GTA. It opens to a
    driving order on a map, with the **drive time and distance between each stop**.
 2. **🧮 Job Calculator** — enter the area to get the price and an estimate of how
    much asphalt (in tons) the job needs.
+3. **📋 Jobs** — save calculations as **quotes** tied to a customer, track their
+   **status**, print a **professional estimate**, and push an address to the route.
 
 It runs entirely in the phone's browser and costs **nothing** — no paid APIs, no
 API keys, no accounts.
@@ -16,8 +18,22 @@ API keys, no accounts.
 ## How to use it
 
 ### Home
-Open the app and tap a tile — **Route Planner** or **Job Calculator**. The bottom
-bar (Home / Route / Calculator) jumps between them any time.
+Open the app and tap a tile — **Route Planner**, **Job Calculator**, or **Jobs**.
+The bottom bar jumps between them any time.
+
+### Jobs (saved quotes)
+- In the **Calculator**, fill in a customer name + address and tap **Save as
+  quote** — it's saved to the **Jobs** tab.
+- Each job shows the price, area, tons, and a **status** you can change:
+  **Quoted → Scheduled → Done**.
+- Per job: **Estimate** builds a printable estimate (your phone's print screen
+  offers **Save as PDF** to email/hand the customer), **To Route** drops the
+  address into the route planner, **Edit** reopens it in the calculator, and
+  **Delete** removes it.
+- Set your **business name / phone / email** once (bottom of the Jobs tab) and it
+  appears on every estimate.
+- Jobs are stored **on this device** (free, no account). Syncing across phones
+  would be a later upgrade.
 
 ### Job Calculator
 - Enter **Length** and **Width** in feet. Tap **+ Add another area** for jobs
