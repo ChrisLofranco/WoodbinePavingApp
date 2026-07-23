@@ -57,6 +57,8 @@
   // ---- UI ----
   var sectionsEl, thicknessEl, rateEl;
   var outSqft, outCash, outTaxed, outHst, outTons;
+  var custNameEl, custAddrEl, custPhoneEl, custEmailEl, saveBtn, saveConfirmEl;
+  var editingId = null, editingJob = null;   // set when editing a saved job
   var sectionCount = 0;
 
   function addSection(focus) {
@@ -120,6 +122,106 @@
     outTons.textContent = fmtTons(q.tons);
   }
 
+  // ---- Saving a quote as a job (uses WoodbineStore) ----
+
+  // Snapshot of the current calculator inputs + computed totals.
+  function currentQuote() {
+    var sections = readSections();
+    return {
+      areas: sections.map(function (s) { return { length: toNum(s.length), width: toNum(s.width) }; }),
+      thickness: toNum(thicknessEl.value),
+      rate: toNum(rateEl.value),
+      totals: quote(sections, thicknessEl.value, rateEl.value)
+    };
+  }
+
+  function updateSaveButton() {
+    if (saveBtn) saveBtn.textContent = editingId ? 'Update saved quote' : 'Save as quote';
+  }
+
+  function showConfirm(msg, isError) {
+    saveConfirmEl.innerHTML = '';
+    saveConfirmEl.className = 'save-confirm' + (isError ? ' error' : '');
+    var span = document.createElement('span');
+    span.textContent = msg;
+    saveConfirmEl.appendChild(span);
+    if (!isError) {
+      var view = document.createElement('button');
+      view.type = 'button'; view.className = 'link-btn'; view.textContent = 'View in Jobs';
+      view.addEventListener('click', function () {
+        if (window.WoodbineApp) window.WoodbineApp.showView('jobs-view');
+      });
+      var neu = document.createElement('button');
+      neu.type = 'button'; neu.className = 'link-btn'; neu.textContent = 'New quote';
+      neu.addEventListener('click', reset);
+      saveConfirmEl.appendChild(view);
+      saveConfirmEl.appendChild(neu);
+    }
+    saveConfirmEl.classList.remove('hidden');
+  }
+
+  function saveQuote() {
+    var snap = currentQuote();
+    if (snap.totals.squareFootage <= 0) { showConfirm('Enter an area (length × width) first.', true); return; }
+    var name = (custNameEl.value || '').trim();
+    var job = {
+      id: editingId || undefined,
+      customer: { name: name, phone: (custPhoneEl.value || '').trim(), email: (custEmailEl.value || '').trim() },
+      address: { text: (custAddrEl.value || '').trim(),
+                 lat: editingJob && editingJob.address ? editingJob.address.lat : undefined,
+                 lng: editingJob && editingJob.address ? editingJob.address.lng : undefined },
+      areas: snap.areas,
+      thickness: snap.thickness,
+      rate: snap.rate,
+      totals: snap.totals,
+      status: (editingJob && editingJob.status) || 'quoted',
+      notes: (editingJob && editingJob.notes) || ''
+    };
+    var saved = window.WoodbineStore.saveJob(job);
+    editingId = saved.id;
+    editingJob = saved;
+    updateSaveButton();
+    showConfirm((name ? name + '’s quote' : 'Quote') + ' saved.', false);
+  }
+
+  // Load a saved job's values back into the calculator for editing.
+  function load(job) {
+    sectionsEl.innerHTML = '';
+    sectionCount = 0;
+    var areas = (job.areas && job.areas.length) ? job.areas : [{ length: '', width: '' }];
+    areas.forEach(function (a) {
+      addSection(false);
+      var block = sectionsEl.lastElementChild;
+      block.querySelector('.inp-length').value = a.length || '';
+      block.querySelector('.inp-width').value = a.width || '';
+    });
+    thicknessEl.value = job.thickness != null ? job.thickness : 2;
+    rateEl.value = job.rate != null ? job.rate : 3.50;
+    custNameEl.value = (job.customer && job.customer.name) || '';
+    custAddrEl.value = (job.address && job.address.text) || '';
+    custPhoneEl.value = (job.customer && job.customer.phone) || '';
+    custEmailEl.value = (job.customer && job.customer.email) || '';
+    editingId = job.id || null;
+    editingJob = job || null;
+    recalc();
+    updateSaveButton();
+    saveConfirmEl.classList.add('hidden');
+  }
+
+  // Reset to a fresh, empty quote.
+  function reset() {
+    sectionsEl.innerHTML = '';
+    sectionCount = 0;
+    addSection(false);
+    thicknessEl.value = 2;
+    rateEl.value = '3.50';
+    custNameEl.value = ''; custAddrEl.value = ''; custPhoneEl.value = ''; custEmailEl.value = '';
+    editingId = null; editingJob = null;
+    recalc();
+    updateSaveButton();
+    saveConfirmEl.classList.add('hidden');
+  }
+
   function init() {
     sectionsEl = document.getElementById('sections');
     thicknessEl = document.getElementById('thickness');
@@ -129,16 +231,31 @@
     outTaxed = document.getElementById('out-taxed');
     outHst = document.getElementById('out-hst');
     outTons = document.getElementById('out-tons');
+    custNameEl = document.getElementById('cust-name');
+    custAddrEl = document.getElementById('cust-address');
+    custPhoneEl = document.getElementById('cust-phone');
+    custEmailEl = document.getElementById('cust-email');
+    saveBtn = document.getElementById('save-quote-btn');
+    saveConfirmEl = document.getElementById('save-confirm');
 
     addSection(false);
     document.getElementById('add-section-btn').addEventListener('click', function () { addSection(true); });
     thicknessEl.addEventListener('input', recalc);
     rateEl.addEventListener('input', recalc);
+    if (saveBtn) saveBtn.addEventListener('click', saveQuote);
+    // Any edit invalidates the "saved" confirmation.
+    [thicknessEl, rateEl, custNameEl, custAddrEl].forEach(function (el) {
+      if (el) el.addEventListener('input', function () { saveConfirmEl.classList.add('hidden'); });
+    });
+    updateSaveButton();
     recalc();
   }
 
   window.WoodbineCalculator = {
     init: init,
+    load: load,
+    reset: reset,
+    currentQuote: currentQuote,
     // exposed for tests:
     totalSquareFootage: totalSquareFootage,
     estimateTons: estimateTons,

@@ -20,9 +20,13 @@
     el.addEventListener('click', function () { showView(el.dataset.view); });
   });
 
+  // Let feature modules navigate between views.
+  window.WoodbineApp = { showView: showView };
+
   // ---- Boot feature modules ----
   if (window.WoodbineCalculator) window.WoodbineCalculator.init();
   if (window.WoodbineRoute) window.WoodbineRoute.init();
+  if (window.WoodbineJobs) window.WoodbineJobs.init();
 
   // ---- Service worker (offline / installable) ----
   if ('serviceWorker' in navigator) {

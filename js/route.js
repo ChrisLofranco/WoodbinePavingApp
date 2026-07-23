@@ -580,6 +580,7 @@
   window.WoodbineRoute = {
     init: init,
     refreshMap: refreshMap,
+    addStop: addStop,          // used by the Jobs tab to send an address here
     // exposed for tests:
     haversine: haversine,
     routeLength: routeLength,

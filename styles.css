@@ -278,3 +278,82 @@ main { padding: 16px; max-width: 640px; margin: 0 auto; }
 .tab-icon { font-size: 22px; filter: grayscale(1) opacity(.7); }
 .tab.active { color: var(--accent); }
 .tab.active .tab-icon { filter: none; }
+
+/* ---------- Text inputs (customer / business fields) ---------- */
+.text-input {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); border-radius: 10px; padding: 13px; font-size: 16px;
+}
+.text-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.text-input::placeholder { color: var(--text-dim); }
+
+.save-confirm {
+  margin: 12px 0 0; font-size: 14px; color: var(--green);
+  display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center;
+}
+.save-confirm.error { color: var(--danger); }
+.link-btn {
+  background: none; border: none; color: var(--accent); font-weight: 700;
+  font-size: 14px; cursor: pointer; padding: 0; text-decoration: underline;
+}
+
+/* ---------- Jobs list ---------- */
+.jobs-empty { color: var(--text-dim); font-size: 14px; line-height: 1.5; }
+.job-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 4px solid var(--accent); border-radius: var(--radius);
+  padding: 14px; margin-bottom: 12px;
+}
+.job-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.job-name { font-weight: 700; font-size: 16px; word-break: break-word; }
+.status-badge {
+  flex: none; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; padding: 3px 9px; border-radius: 999px;
+}
+.status-quoted { background: rgba(255,255,255,.10); color: #fff; border: 1px solid rgba(255,255,255,.3); }
+.status-scheduled { background: rgba(245,166,35,.15); color: #f5a623; border: 1px solid rgba(245,166,35,.5); }
+.status-done { background: rgba(46,204,113,.15); color: var(--green); border: 1px solid rgba(46,204,113,.5); }
+.job-addr { color: var(--text-dim); font-size: 14px; margin-top: 4px; word-break: break-word; }
+.job-meta { font-size: 14px; margin-top: 6px; font-weight: 600; }
+.job-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+.status-select {
+  background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 10px; font-size: 13px; font-weight: 600;
+}
+.job-btn { padding: 8px 12px; font-size: 13px; }
+.job-del { color: var(--danger); }
+
+/* ---------- Printable estimate ---------- */
+.estimate-sheet { display: none; }
+@media print {
+  body { background: #fff !important; }
+  body > *:not(.estimate-sheet) { display: none !important; }
+  .estimate-sheet {
+    display: block !important; color: #111; background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    padding: 24px; max-width: 720px; margin: 0 auto;
+  }
+}
+.estimate-sheet .est-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 16px; border-bottom: 3px solid #e11b22; padding-bottom: 14px;
+}
+.estimate-sheet .est-logo { height: 44px; width: auto; filter: invert(1); } /* white logo → black on paper */
+.estimate-sheet .est-biz { text-align: right; font-size: 12px; color: #333; line-height: 1.4; }
+.estimate-sheet .est-biz-name { font-weight: 800; font-size: 15px; color: #111; }
+.estimate-sheet .est-title-row { display: flex; justify-content: space-between; align-items: flex-end; margin: 18px 0 10px; }
+.estimate-sheet h1 { font-size: 26px; letter-spacing: 2px; margin: 0; color: #111; }
+.estimate-sheet .est-meta { font-size: 12px; color: #333; text-align: right; line-height: 1.5; }
+.estimate-sheet .est-billto { margin: 8px 0 16px; font-size: 13px; line-height: 1.5; }
+.estimate-sheet .est-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #777; }
+.estimate-sheet .est-cust { font-weight: 700; font-size: 15px; }
+.estimate-sheet .est-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.estimate-sheet .est-table th { text-align: left; border-bottom: 2px solid #111; padding: 8px 6px; }
+.estimate-sheet .est-table td { border-bottom: 1px solid #ddd; padding: 8px 6px; }
+.estimate-sheet .est-table .num { text-align: right; }
+.estimate-sheet .est-table tfoot td { font-weight: 700; border-top: 2px solid #111; border-bottom: none; }
+.estimate-sheet .est-note-line { font-size: 12px; color: #555; margin: 8px 0 14px; }
+.estimate-sheet .est-totals { margin-left: auto; width: 260px; max-width: 100%; }
+.estimate-sheet .est-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+.estimate-sheet .est-total { border-top: 2px solid #111; margin-top: 4px; padding-top: 10px; font-size: 18px; font-weight: 800; }
+.estimate-sheet .est-foot { margin-top: 24px; font-size: 11px; color: #777; border-top: 1px solid #ddd; padding-top: 10px; }
