@@ -13,6 +13,7 @@
 
   var NOMINATIM = 'https://nominatim.openstreetmap.org/search';
   var OSRM = 'https://router.project-osrm.org/route/v1/driving/';
+  var OSRM_TABLE = 'https://router.project-osrm.org/table/v1/driving/';
   // Photon (free, keyless) powers the type-ahead address suggestions.
   var PHOTON = 'https://photon.komoot.io/api/';
   // Bias geocoding toward the Greater Toronto Area.
@@ -45,59 +46,54 @@
     return total;
   }
 
-  // Order points for the shortest path. If fixStart, index 0 stays first
-  // (used when the first stop is the crew's starting location).
-  // Nearest-neighbor for an initial tour, improved with 2-opt.
-  function optimizeOrder(pts, fixStart) {
-    var n = pts.length;
-    if (n <= 2) return pts.map(function (_, i) { return i; });
+  // Core open-path optimizer over an arbitrary cost(i, j) between point indices.
+  // Nearest-neighbor for an initial tour, then 2-opt. If fixStart, index 0 stays
+  // first (the crew's starting location). Works for any number of stops.
+  function optimizeByCost(n, cost, fixStart) {
+    if (n <= 2) { var seq = []; for (var s = 0; s < n; s++) seq.push(s); return seq; }
 
-    // Nearest-neighbor construction.
-    var startIdx = 0;
+    // Nearest-neighbor construction from index 0.
     var visited = new Array(n).fill(false);
-    var order = [startIdx];
-    visited[startIdx] = true;
+    var order = [0];
+    visited[0] = true;
     for (var k = 1; k < n; k++) {
-      var last = order[order.length - 1];
-      var best = -1, bestD = Infinity;
+      var last = order[order.length - 1], best = -1, bestD = Infinity;
       for (var j = 0; j < n; j++) {
         if (!visited[j]) {
-          var d = haversine(pts[last], pts[j]);
+          var d = cost(last, j);
           if (d < bestD) { bestD = d; best = j; }
         }
       }
-      order.push(best);
-      visited[best] = true;
+      order.push(best); visited[best] = true;
     }
 
-    // 2-opt improvement (open path, not a loop back to start).
-    var improved = true;
-    var lowerBound = fixStart ? 1 : 0; // keep the start fixed if requested
+    // 2-opt improvement (open path, no loop back to start).
+    var segCost = function (i, m) {
+      var c = 0;
+      if (i > 0) c += cost(order[i - 1], order[i]);
+      if (m < order.length - 1) c += cost(order[m], order[m + 1]);
+      return c;
+    };
+    var improved = true, lowerBound = fixStart ? 1 : 0;
     while (improved) {
       improved = false;
-      for (var i = lowerBound; i < order.length - 1; i++) {
-        for (var m = i + 1; m < order.length; m++) {
-          var before = segCost(order, i, m, pts);
-          reverse(order, i, m);
-          var after = segCost(order, i, m, pts);
-          if (after + 1e-9 < before) {
-            improved = true;
-          } else {
-            reverse(order, i, m); // revert
-          }
+      for (var a = lowerBound; a < order.length - 1; a++) {
+        for (var b = a + 1; b < order.length; b++) {
+          var before = segCost(a, b);
+          reverse(order, a, b);
+          if (segCost(a, b) + 1e-9 < before) improved = true;
+          else reverse(order, a, b); // revert
         }
       }
     }
     return order;
   }
 
-  // Cost of the edges touched by reversing order[i..m], guarding array ends.
-  function segCost(order, i, m, pts) {
-    var c = 0;
-    if (i > 0) c += haversine(pts[order[i - 1]], pts[order[i]]);
-    if (m < order.length - 1) c += haversine(pts[order[m]], pts[order[m + 1]]);
-    return c;
+  // Straight-line (haversine) ordering — fallback + unit tests.
+  function optimizeOrder(pts, fixStart) {
+    return optimizeByCost(pts.length, function (i, j) { return haversine(pts[i], pts[j]); }, fixStart);
   }
+
   function reverse(arr, i, m) {
     while (i < m) { var t = arr[i]; arr[i] = arr[m]; arr[m] = t; i++; m--; }
   }
@@ -119,25 +115,42 @@
       });
   }
 
-  // Nominatim asks for <=1 request/second; geocode stops sequentially.
-  // Stops chosen from the autocomplete (or "my location") already carry
-  // coordinates, so we skip the lookup for those.
-  function geocodeAll(list) {
-    var results = [];
+  // Nominatim asks for <=1 request/second; geocode stops sequentially. Stops
+  // chosen from the autocomplete (or "my location") already carry coordinates,
+  // so we skip the lookup for those. onProgress(done,total) is optional.
+  function geocodeAll(list, onProgress) {
+    var results = [], toLookup = list.filter(function (i) {
+      return typeof i.lat !== 'number' || typeof i.lng !== 'number';
+    }).length, done = 0;
     return list.reduce(function (p, item) {
       return p.then(function () {
         if (typeof item.lat === 'number' && typeof item.lng === 'number') {
           results.push({ item: item, coords: { lat: item.lat, lng: item.lng } });
           return;
         }
+        if (onProgress) onProgress(done + 1, toLookup);
         return geocode(item.text).then(function (coords) {
           results.push({ item: item, coords: coords });
+          done += 1;
           return delay(1100);
         });
       });
     }, Promise.resolve()).then(function () { return results; });
   }
   function delay(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+
+  // Driving-time matrix (seconds, N×N) via OSRM /table. Powers the "fastest
+  // order" optimization. Resolves to the matrix, or null if unavailable.
+  function fetchDurationMatrix(pts) {
+    var coordParam = pts.map(function (p) { return p.lng + ',' + p.lat; }).join(';');
+    return fetch(OSRM_TABLE + coordParam + '?annotations=duration')
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (data) {
+        if (!data || !data.durations) throw new Error('no table');
+        return data.durations;
+      })
+      .catch(function () { return null; });
+  }
 
   // ---------- Map ----------
 
@@ -240,7 +253,7 @@
 
   // ---------- UI ----------
 
-  var inputEl, listEl, optimizeBtn, statusEl, resultEl, orderedEl, mapsLink, totalEl;
+  var inputEl, listEl, optimizeBtn, statusEl, resultEl, orderedEl, mapsLink, totalEl, wazeLink;
   var suggestEl;                       // dropdown <ul>
   var pendingCoords = null;            // coords of the currently picked suggestion
   var suggestItems = [];               // current suggestion data
@@ -297,38 +310,57 @@
     optimizeBtn.disabled = true;
     resultEl.classList.add('hidden');
 
-    geocodeAll(stops).then(function (results) {
-      var failed = results.filter(function (r) { return !r.coords; });
-      if (failed.length) {
-        setStatus('Could not find: ' + failed.map(function (r) { return r.item.text; }).join('; '), 'error');
+    geocodeAll(stops, function (done, total) {
+      if (total > 1) setStatus('Looking up address ' + done + ' of ' + total + '…', 'working');
+    }).then(function (results) {
+      var found = results.filter(function (r) { return r.coords; });
+      var missing = results.filter(function (r) { return !r.coords; });
+      // Don't let one bad address block the whole route — use the ones we found.
+      if (found.length < 2) {
+        setStatus('Need at least 2 addresses I can find. Couldn’t locate: ' +
+          missing.map(function (r) { return r.item.text; }).join('; '), 'error');
         optimizeBtn.disabled = false;
         return;
       }
-      var geocoded = results.map(function (r) {
-        return Object.assign({}, r.item, r.coords);
-      });
+      var geocoded = found.map(function (r) { return Object.assign({}, r.item, r.coords); });
       // Start point (if any) is always index 0 and stays fixed.
       var startFirst = geocoded.slice().sort(function (a, b) {
         return (b.isStart ? 1 : 0) - (a.isStart ? 1 : 0);
       });
       var pts = startFirst.map(function (s) { return { lat: s.lat, lng: s.lng }; });
-      var order = optimizeOrder(pts, startFirst[0].isStart);
-      var ordered = order.map(function (idx) { return startFirst[idx]; });
+      var fixStart = startFirst[0].isStart;
+      var warn = missing.length ? '  ·  skipped ' + missing.length + ' not found' : '';
 
-      setStatus('Calculating drive times…', 'working');
-      fetchRoute(ordered).then(function (route) {
-        if (!route) route = estimateRoute(ordered);
-        drawRoute(ordered, route.geometry);
-        showResult(ordered, route);
-        setStatus('Optimized ' + ordered.length + ' stops · ' +
-          fmtDur(route.totalDuration) + ' total drive' + (route.estimated ? ' (estimated)' : ''), '');
-        optimizeBtn.disabled = false;
+      // Order stops by fastest DRIVING time (OSRM matrix); straight-line if it
+      // isn't available.
+      setStatus('Finding the fastest order…', 'working');
+      fetchDurationMatrix(pts).then(function (matrix) {
+        var order = matrix
+          ? optimizeByCost(pts.length, function (i, j) { return matrix[i][j]; }, fixStart)
+          : optimizeOrder(pts, fixStart);
+        var ordered = order.map(function (idx) { return startFirst[idx]; });
+
+        setStatus('Calculating drive times…', 'working');
+        fetchRoute(ordered).then(function (route) {
+          if (!route) route = estimateRoute(ordered);
+          drawRoute(ordered, route.geometry);
+          showResult(ordered, route);
+          setStatus('Optimized ' + ordered.length + ' stops · ' + fmtDur(route.totalDuration) +
+            ' total drive' + (route.estimated ? ' (estimated)' : '') + warn,
+            missing.length ? 'error' : '');
+          optimizeBtn.disabled = false;
+        });
       });
     }).catch(function (err) {
       console.error(err);
       setStatus('Address lookup failed — check your connection and try again.', 'error');
       optimizeBtn.disabled = false;
     });
+  }
+
+  // Waze deep link to a single stop (Waze has no multi-waypoint URL).
+  function wazeUrl(s) {
+    return 'https://waze.com/ul?ll=' + s.lat + '%2C' + s.lng + '&navigate=yes';
   }
 
   function showResult(ordered, route) {
@@ -345,6 +377,16 @@
       txt.className = 'ordered-text';
       txt.textContent = s.text + (s.isStart ? '  (start)' : '');
       head.appendChild(badge); head.appendChild(txt);
+      // Per-stop Waze launch — drive straight to this stop.
+      if (!s.isStart) {
+        var wz = document.createElement('a');
+        wz.className = 'stop-nav';
+        wz.href = wazeUrl(s);
+        wz.target = '_blank'; wz.rel = 'noopener';
+        wz.setAttribute('aria-label', 'Navigate to this stop in Waze');
+        wz.textContent = 'Waze ▸';
+        head.appendChild(wz);
+      }
       li.appendChild(head);
       // Drive time & distance to the next stop.
       if (i < ordered.length - 1 && legs[i]) {
@@ -365,7 +407,11 @@
       totalEl.classList.add('hidden');
     }
 
-    // Google Maps handoff for turn-by-turn once driving (a free deep link).
+    // Waze "start" button → the first place to actually drive to.
+    var firstTarget = (ordered[0].isStart && ordered[1]) ? ordered[1] : ordered[0];
+    wazeLink.href = wazeUrl(firstTarget);
+
+    // Google Maps full-route deep link (free; carries the whole ordered route).
     var origin = ordered[0];
     var dest = ordered[ordered.length - 1];
     var waypoints = ordered.slice(1, -1).map(function (s) { return s.lat + ',' + s.lng; }).join('|');
@@ -498,6 +544,7 @@
     resultEl = document.getElementById('route-result');
     orderedEl = document.getElementById('ordered-stops');
     mapsLink = document.getElementById('open-maps-link');
+    wazeLink = document.getElementById('open-waze-link');
     totalEl = document.getElementById('route-total');
     suggestEl = document.getElementById('suggestions');
 

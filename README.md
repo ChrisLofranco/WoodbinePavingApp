@@ -29,14 +29,19 @@ bar (Home / Route / Calculator) jumps between them any time.
   a standard hot-mix density ≈ 145 lb/ft³.)
 
 ### Route Planner
-- Start typing an address and a **dropdown of matches** appears — tap one (or
-  arrow-keys + Enter) and tap **Add**. Or tap **📍 Use my current location** as
-  the start.
-- Tap **Optimize Route**. You get the shortest driving order on the map with
-  numbered stops, plus **drive time + distance to each next stop** and a **total
-  drive time** for the day.
-- Tap **Open in Google Maps** to hand the ordered route to Google Maps for
-  turn-by-turn while you drive (a free link — no account needed).
+- Add **as many stops as you need** — start typing an address, pick from the
+  **dropdown of matches** (or arrow-keys + Enter), and tap **Add**. Or tap
+  **📍 Use my current location** as the start.
+- Tap **Optimize Route**. Stops are ordered for the **fastest real driving time**
+  (via OSRM's time matrix; straight-line fallback if that's unavailable), shown on
+  the map with numbered stops, **drive time + distance to each next stop**, and a
+  **total drive time**.
+- **Navigate:** tap **▸ Start in Waze** to drive to the next stop, then the
+  **Waze ▸** link on each stop as you go (Waze navigates one stop at a time). Or
+  tap **Open full route in Google Maps** to load the whole route at once. Both are
+  free links — no account needed.
+- If an address can't be found, the route is still built from the rest and tells
+  you which one was skipped (one bad address no longer blocks everything).
 
 ---
 
@@ -47,8 +52,9 @@ bar (Home / Route / Calculator) jumps between them any time.
 | Map display | [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) tiles (bundled in `vendor/leaflet/`) |
 | Address suggestions | [Photon](https://photon.komoot.io/) (OpenStreetMap) |
 | Address → map location | [Nominatim](https://nominatim.org/) (OpenStreetMap geocoder) |
+| Fastest stop order | [OSRM](http://project-osrm.org/) driving-time matrix + on-device nearest-neighbor / 2-opt (straight-line fallback) |
 | Road route + drive times | [OSRM](http://project-osrm.org/) public server, with a straight-line + estimated-time fallback |
-| Best stop order | Calculated on your phone (nearest-neighbor + 2-opt) |
+| Turn-by-turn navigation | Free deep links to **Waze** (per stop) and **Google Maps** (full route) |
 
 The free public OSM/OSRM servers are best-effort and rate-limited — plenty for
 one crew's daily use. The map and address/route lookups need an internet
