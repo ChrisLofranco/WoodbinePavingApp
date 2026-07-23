@@ -253,12 +253,7 @@
 
   // ---------- UI ----------
 
-  var inputEl, listEl, optimizeBtn, statusEl, resultEl, orderedEl, mapsLink, totalEl, wazeLink;
-  var suggestEl;                       // dropdown <ul>
-  var pendingCoords = null;            // coords of the currently picked suggestion
-  var suggestItems = [];               // current suggestion data
-  var activeIdx = -1;                  // highlighted suggestion (keyboard)
-  var suggestTimer = null, suggestSeq = 0;
+  var listEl, optimizeBtn, statusEl, resultEl, orderedEl, mapsLink, totalEl, wazeLink;
 
   function render() {
     listEl.innerHTML = '';
@@ -457,87 +452,98 @@
     return { main: main, sub: sub, text: text, lat: c[1], lng: c[0] };
   }
 
-  function fetchSuggestions(query) {
-    var seq = ++suggestSeq;
-    var url = PHOTON + '?q=' + encodeURIComponent(query) +
-      '&limit=6&lang=en&lat=' + GTA_CENTER[0] + '&lon=' + GTA_CENTER[1];
-    fetch(url)
-      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
-      .then(function (data) {
-        if (seq !== suggestSeq) return;                 // a newer query superseded this one
-        var feats = (data && data.features) || [];
-        renderSuggestions(feats.map(formatFeature).filter(function (s) {
-          return typeof s.lat === 'number' && typeof s.lng === 'number';
-        }));
-      })
-      .catch(function () {
-        if (seq === suggestSeq) clearSuggestions();      // network/offline: just hide it
-      });
-  }
+  // Attach type-ahead address autocomplete to an <input> + dropdown <ul>.
+  // onCommit(text, coords) fires when the user commits an entry (Enter / button);
+  // coords are present when the entry was picked from the dropdown. Returns a
+  // handle with commit() so an external button can trigger it.
+  function attachAutocomplete(input, dropdown, onCommit) {
+    var items = [], active = -1, pending = null, timer = null, seq = 0;
 
-  function renderSuggestions(items) {
-    suggestItems = items;
-    activeIdx = -1;
-    suggestEl.innerHTML = '';
-    if (!items.length) { clearSuggestions(); return; }
-    items.forEach(function (item, i) {
-      var li = document.createElement('li');
-      li.setAttribute('role', 'option');
-      var main = document.createElement('span');
-      main.className = 'sug-main';
-      main.textContent = item.main;
-      li.appendChild(main);
-      if (item.sub) {
-        var sub = document.createElement('span');
-        sub.className = 'sug-sub';
-        sub.textContent = '· ' + item.sub;
-        li.appendChild(sub);
-      }
-      li.addEventListener('mousedown', function (e) {
-        e.preventDefault();                 // keep focus in the input
-        selectSuggestion(i);
+    function fetchSuggestions(query) {
+      var mySeq = ++seq;
+      var url = PHOTON + '?q=' + encodeURIComponent(query) +
+        '&limit=6&lang=en&lat=' + GTA_CENTER[0] + '&lon=' + GTA_CENTER[1];
+      fetch(url)
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function (data) {
+          if (mySeq !== seq) return;               // superseded by a newer query
+          var feats = (data && data.features) || [];
+          render(feats.map(formatFeature).filter(function (s) {
+            return typeof s.lat === 'number' && typeof s.lng === 'number';
+          }));
+        })
+        .catch(function () { if (mySeq === seq) clear(); });
+    }
+
+    function render(list) {
+      items = list; active = -1; dropdown.innerHTML = '';
+      if (!list.length) { clear(); return; }
+      list.forEach(function (item, i) {
+        var li = document.createElement('li');
+        li.setAttribute('role', 'option');
+        var main = document.createElement('span');
+        main.className = 'sug-main'; main.textContent = item.main;
+        li.appendChild(main);
+        if (item.sub) {
+          var sub = document.createElement('span');
+          sub.className = 'sug-sub'; sub.textContent = '· ' + item.sub;
+          li.appendChild(sub);
+        }
+        li.addEventListener('mousedown', function (e) { e.preventDefault(); select(i); });
+        dropdown.appendChild(li);
       });
-      suggestEl.appendChild(li);
+      dropdown.classList.remove('hidden');
+      input.setAttribute('aria-expanded', 'true');
+    }
+
+    function clear() {
+      items = []; active = -1; dropdown.innerHTML = '';
+      dropdown.classList.add('hidden');
+      input.setAttribute('aria-expanded', 'false');
+    }
+
+    function highlight(idx) {
+      dropdown.querySelectorAll('li').forEach(function (li, i) {
+        li.classList.toggle('active', i === idx);
+      });
+      active = idx;
+    }
+
+    function select(i) {
+      var item = items[i];
+      if (!item) return;
+      input.value = item.text;               // programmatic set doesn't fire 'input'
+      pending = { lat: item.lat, lng: item.lng };
+      clear();
+    }
+
+    function commit() {
+      var text = input.value.trim();
+      if (!text) return;
+      onCommit(text, pending);
+      input.value = ''; pending = null; clear(); input.focus();
+    }
+
+    input.addEventListener('input', function () {
+      pending = null;
+      var q = input.value.trim();
+      if (timer) clearTimeout(timer);
+      if (q.length < 3) { clear(); return; }
+      timer = setTimeout(function () { fetchSuggestions(q); }, 280);
     });
-    suggestEl.classList.remove('hidden');
-    inputEl.setAttribute('aria-expanded', 'true');
-  }
+    input.addEventListener('keydown', function (e) {
+      var open = !dropdown.classList.contains('hidden') && items.length;
+      if (e.key === 'ArrowDown' && open) { e.preventDefault(); highlight((active + 1) % items.length); }
+      else if (e.key === 'ArrowUp' && open) { e.preventDefault(); highlight((active - 1 + items.length) % items.length); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (open && active >= 0) select(active); else commit(); }
+      else if (e.key === 'Escape') { clear(); }
+    });
+    input.addEventListener('blur', function () { setTimeout(clear, 120); });
 
-  function clearSuggestions() {
-    suggestItems = [];
-    activeIdx = -1;
-    suggestEl.innerHTML = '';
-    suggestEl.classList.add('hidden');
-    inputEl.setAttribute('aria-expanded', 'false');
-  }
-
-  function highlight(idx) {
-    var lis = suggestEl.querySelectorAll('li');
-    lis.forEach(function (li, i) { li.classList.toggle('active', i === idx); });
-    activeIdx = idx;
-  }
-
-  function selectSuggestion(i) {
-    var item = suggestItems[i];
-    if (!item) return;
-    inputEl.value = item.text;             // programmatic set does not fire 'input'
-    pendingCoords = { lat: item.lat, lng: item.lng };
-    clearSuggestions();
-  }
-
-  // Add whatever is in the input as a stop, using picked coords when available.
-  function commitInput() {
-    var text = inputEl.value.trim();
-    if (!text) return;
-    addStop(text, false, pendingCoords);
-    inputEl.value = '';
-    pendingCoords = null;
-    clearSuggestions();
-    inputEl.focus();
+    return { commit: commit };
   }
 
   function init() {
-    inputEl = document.getElementById('stop-input');
     listEl = document.getElementById('stop-list');
     optimizeBtn = document.getElementById('optimize-btn');
     statusEl = document.getElementById('route-status');
@@ -546,39 +552,22 @@
     mapsLink = document.getElementById('open-maps-link');
     wazeLink = document.getElementById('open-waze-link');
     totalEl = document.getElementById('route-total');
-    suggestEl = document.getElementById('suggestions');
 
-    document.getElementById('add-stop-btn').addEventListener('click', commitInput);
+    // Starting-location field (type an address to set the start).
+    var startInput = document.getElementById('start-input');
+    var startAC = attachAutocomplete(
+      startInput, document.getElementById('start-suggestions'),
+      function (text, coords) { addStop(text, true, coords); setStatus('Start set to ' + text + '.', ''); }
+    );
+    document.getElementById('set-start-btn').addEventListener('click', startAC.commit);
 
-    // Type-ahead: debounce, then fetch suggestions. Typing invalidates any
-    // previously picked coordinates.
-    inputEl.addEventListener('input', function () {
-      pendingCoords = null;
-      var q = inputEl.value.trim();
-      if (suggestTimer) clearTimeout(suggestTimer);
-      if (q.length < 3) { clearSuggestions(); return; }
-      suggestTimer = setTimeout(function () { fetchSuggestions(q); }, 280);
-    });
-
-    inputEl.addEventListener('keydown', function (e) {
-      var open = !suggestEl.classList.contains('hidden') && suggestItems.length;
-      if (e.key === 'ArrowDown' && open) {
-        e.preventDefault();
-        highlight((activeIdx + 1) % suggestItems.length);
-      } else if (e.key === 'ArrowUp' && open) {
-        e.preventDefault();
-        highlight((activeIdx - 1 + suggestItems.length) % suggestItems.length);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (open && activeIdx >= 0) { selectSuggestion(activeIdx); }
-        else { commitInput(); }
-      } else if (e.key === 'Escape') {
-        clearSuggestions();
-      }
-    });
-
-    // Close the dropdown when focus leaves the field.
-    inputEl.addEventListener('blur', function () { setTimeout(clearSuggestions, 120); });
+    // Stops field.
+    var stopInput = document.getElementById('stop-input');
+    var stopAC = attachAutocomplete(
+      stopInput, document.getElementById('suggestions'),
+      function (text, coords) { addStop(text, false, coords); }
+    );
+    document.getElementById('add-stop-btn').addEventListener('click', stopAC.commit);
 
     document.getElementById('use-location-btn').addEventListener('click', useLocation);
     optimizeBtn.addEventListener('click', optimize);

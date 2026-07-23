@@ -93,6 +93,11 @@ main { padding: 16px; max-width: 640px; margin: 0 auto; }
 .btn-ghost:hover { color: var(--text); }
 
 /* ---------- Route: stop input ---------- */
+.field-heading {
+  display: block; font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--text-dim); margin: 14px 0 8px;
+}
+.card > .field-heading:first-child { margin-top: 2px; }
 .stop-input-wrap { position: relative; margin-bottom: 8px; }
 .stop-input-row { display: flex; gap: 8px; }
 .stop-input-row input {

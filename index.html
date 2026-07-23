@@ -49,18 +49,30 @@
       <p class="view-hint">Add as many stops as you need, then optimize for the fastest driving order.</p>
 
       <div class="card">
+        <span class="field-heading">Starting location</span>
+        <div class="stop-input-wrap">
+          <div class="stop-input-row">
+            <input id="start-input" type="text" inputmode="text" autocomplete="off"
+                   placeholder="Enter a start address…" role="combobox"
+                   aria-autocomplete="list" aria-expanded="false" aria-controls="start-suggestions" />
+            <button id="set-start-btn" class="btn btn-secondary" type="button">Set</button>
+          </div>
+          <ul id="start-suggestions" class="suggestions hidden" role="listbox" aria-label="Start address suggestions"></ul>
+        </div>
+        <button id="use-location-btn" class="btn btn-ghost btn-block" type="button">
+          📍 Use my current location
+        </button>
+
+        <span class="field-heading">Stops</span>
         <div class="stop-input-wrap">
           <div class="stop-input-row">
             <input id="stop-input" type="text" inputmode="text" autocomplete="off"
-                   placeholder="Start typing an address…" role="combobox"
+                   placeholder="Add a stop address…" role="combobox"
                    aria-autocomplete="list" aria-expanded="false" aria-controls="suggestions" />
             <button id="add-stop-btn" class="btn btn-secondary" type="button">Add</button>
           </div>
           <ul id="suggestions" class="suggestions hidden" role="listbox" aria-label="Address suggestions"></ul>
         </div>
-        <button id="use-location-btn" class="btn btn-ghost btn-block" type="button">
-          📍 Use my current location as start
-        </button>
 
         <ul id="stop-list" class="stop-list" aria-label="Stops"></ul>
 

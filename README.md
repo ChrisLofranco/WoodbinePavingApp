@@ -29,9 +29,11 @@ bar (Home / Route / Calculator) jumps between them any time.
   a standard hot-mix density ≈ 145 lb/ft³.)
 
 ### Route Planner
+- **Starting location:** type a start address (with the same suggestions
+  dropdown) and tap **Set**, or tap **📍 Use my current location**. The start is
+  kept fixed at the front of the route.
 - Add **as many stops as you need** — start typing an address, pick from the
-  **dropdown of matches** (or arrow-keys + Enter), and tap **Add**. Or tap
-  **📍 Use my current location** as the start.
+  **dropdown of matches** (or arrow-keys + Enter), and tap **Add**.
 - Tap **Optimize Route**. Stops are ordered for the **fastest real driving time**
   (via OSRM's time matrix; straight-line fallback if that's unavailable), shown on
   the map with numbered stops, **drive time + distance to each next stop**, and a
